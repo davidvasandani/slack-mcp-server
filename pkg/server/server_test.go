@@ -25,6 +25,7 @@ func TestShouldAddTool_ReadOnly_EmptyEnabledTools(t *testing.T) {
 			ToolConversationsSearchMessages,
 			ToolChannelsList,
 			ToolUsersSearch,
+			ToolAttachmentGetData,
 		}
 		for _, tool := range readOnlyTools {
 			result := shouldAddTool(tool, []string{}, "")
@@ -286,29 +287,26 @@ func TestShouldAddTool_WriteTool_Reactions(t *testing.T) {
 	})
 }
 
-func TestShouldAddTool_WriteTool_Attachment(t *testing.T) {
-	t.Run("empty enabledTools and no env var - not registered", func(t *testing.T) {
+func TestShouldAddTool_ReadOnly_Attachment(t *testing.T) {
+	t.Run("empty enabledTools and no env var - registered", func(t *testing.T) {
 		cleanup := setEnv("SLACK_MCP_ATTACHMENT_TOOL", "")
 		defer cleanup()
 
-		result := shouldAddTool(ToolAttachmentGetData, []string{}, "SLACK_MCP_ATTACHMENT_TOOL")
-		assert.False(t, result, "attachment_get_data should NOT be registered when env var is not set")
+		result := shouldAddTool(ToolAttachmentGetData, []string{}, "")
+		assert.True(t, result)
 	})
 
-	t.Run("empty enabledTools and env var set - registered", func(t *testing.T) {
+	t.Run("deprecated env var is ignored", func(t *testing.T) {
 		cleanup := setEnv("SLACK_MCP_ATTACHMENT_TOOL", "true")
 		defer cleanup()
 
-		result := shouldAddTool(ToolAttachmentGetData, []string{}, "SLACK_MCP_ATTACHMENT_TOOL")
-		assert.True(t, result, "attachment_get_data should be registered when env var is set")
+		assert.True(t, shouldAddTool(ToolAttachmentGetData, []string{}, ""))
+		assert.False(t, shouldAddTool(ToolAttachmentGetData, []string{ToolConversationsHistory}, ""))
 	})
 
-	t.Run("explicit enabledTools includes tool - registered without env var", func(t *testing.T) {
-		cleanup := setEnv("SLACK_MCP_ATTACHMENT_TOOL", "")
-		defer cleanup()
-
-		result := shouldAddTool(ToolAttachmentGetData, []string{ToolAttachmentGetData}, "SLACK_MCP_ATTACHMENT_TOOL")
-		assert.True(t, result, "attachment_get_data should be registered when explicitly in enabledTools")
+	t.Run("explicit enabledTools controls registration", func(t *testing.T) {
+		assert.True(t, shouldAddTool(ToolAttachmentGetData, []string{ToolAttachmentGetData}, ""))
+		assert.False(t, shouldAddTool(ToolAttachmentGetData, []string{ToolConversationsHistory}, ""))
 	})
 }
 

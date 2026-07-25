@@ -239,7 +239,7 @@ func NewMCPServer(provider *provider.ApiProvider, logger *zap.Logger, enabledToo
 		), conversationsHandler.ReactionsRemoveHandler)
 	}
 
-	if shouldAddTool(ToolAttachmentGetData, enabledTools, "SLACK_MCP_ATTACHMENT_TOOL") {
+	if shouldAddTool(ToolAttachmentGetData, enabledTools, "") {
 		s.AddTool(mcp.NewTool(ToolAttachmentGetData,
 			mcp.WithDescription("Download an attachment's content by file ID. Returns file metadata and content (text files as-is, binary files as base64). Maximum file size is 5MB."),
 			mcp.WithTitleAnnotation("Get Attachment Data"),
