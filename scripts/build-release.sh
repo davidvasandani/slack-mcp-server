@@ -32,12 +32,36 @@ base_url="https://github.com/davidvasandani/slack-mcp-server/releases/download/$
 # libc, and cross-compilation needs no toolchain per target.
 export CGO_ENABLED=0
 
-echo "build-release: building binaries for $tag"
-make build-all-platforms
+# Same ldflags as `make build-all-platforms`, with two changes that make a
+# rebuild of the same tag byte-identical (the digests we publish are the pin):
+# BuildTime comes from the tagged commit instead of the wall clock, and
+# -trimpath removes the builder's directory layout.
+package="$(go list -m)"
+commit_hash="$(git rev-parse HEAD)"
+# TZ is pinned: `--date=format-local` renders in the *builder's* timezone, so
+# without this the same tag stamps a different BuildTime — and a different
+# digest — on a machine that is not on UTC.
+build_time="$(TZ=UTC0 git show -s --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ HEAD)"
+binary_name="slack-mcp-server"
+ld_flags="-s -w \
+  -X '$package/pkg/version.CommitHash=$commit_hash' \
+  -X '$package/pkg/version.Version=$tag' \
+  -X '$package/pkg/version.BuildTime=$build_time' \
+  -X '$package/pkg/version.BinaryName=$binary_name'"
 
 rm -rf "$dist_dir"
 mkdir -p "$dist_dir"
-cp build/slack-mcp-server-* "$dist_dir/"
+
+echo "build-release: building binaries for $tag"
+for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+  goos="${target%/*}"
+  goarch="${target#*/}"
+  suffix=""
+  [ "$goos" = "windows" ] && suffix=".exe"
+  echo "  $goos/$goarch"
+  GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "$ld_flags" \
+    -o "$dist_dir/$binary_name-$goos-$goarch$suffix" ./cmd/slack-mcp-server
+done
 
 echo "build-release: writing $launcher_dir/checksums.json"
 node - "$dist_dir" "$launcher_dir/checksums.json" "$version" "$tag" "$base_url" <<'NODE'

@@ -10,7 +10,7 @@ one immutable, digest-verified artifact:
   "command": "npx",
   "args": [
     "-y",
-    "https://github.com/davidvasandani/slack-mcp-server/releases/download/v1.3.0-vk.1/slack-mcp-server-vk-1.3.0-vk.1.tgz",
+    "https://github.com/davidvasandani/slack-mcp-server/releases/download/v1.3.0-vk.2/slack-mcp-server-vk-1.3.0-vk.2.tgz",
     "--transport",
     "stdio"
   ],
@@ -63,9 +63,9 @@ passed through untouched to the server.
 the binaries exist.
 
 ```bash
-git tag -a v1.3.0-vk.2 -m "Release v1.3.0-vk.2"      # <base>-vk.<n>
+git tag -a v1.3.0-vk.3 -m "Release v1.3.0-vk.3"      # <base>-vk.<n>
 scripts/build-release.sh                              # builds, tests, packs
-gh release create v1.3.0-vk.2 dist/* --title …        # upload every asset
+gh release create v1.3.0-vk.3 dist/* --title …        # upload every asset
 ```
 
 Then update the consumer: the URL in `crates/executors/default_mcp.json`, the
