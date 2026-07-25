@@ -1,9 +1,14 @@
 name: Release NPM
 
+# Fork releases (`v<base>-vk.<n>`) are built and published by
+# scripts/build-release.sh + `gh release create`, not by this workflow: its
+# final step publishes to the *upstream* npm package name, which this fork does
+# not own. Ignore those tags so cutting a fork release can never trigger a
+# publish under someone else's name.
 on:
   push:
-    tags:
-      - '*'
+    tags-ignore:
+      - '*-vk.*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,5 +56,6 @@ jobs:
             docker-compose.yml
 
       - name: Publish npm
+        if: ${{ env.NPM_TOKEN != '' }}
         run:
           make npm-publish

@@ -15,3 +15,7 @@
 /npm/slack-mcp-server/LICENSE
 /npm/slack-mcp-server/README.md
 docker-compose.release.yml
+
+# Vibe Kanban launcher build outputs
+/packaging/npm-launcher/checksums.json
+/dist/

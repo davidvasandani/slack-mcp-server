@@ -1,9 +1,12 @@
 name: Release Image
 
+# Fork releases (`v<base>-vk.<n>`) must not publish container images: this
+# workflow pushes to the upstream Docker Hub namespace, which this fork does not
+# own.
 on:
   push:
-    tags:
-      - '*'
+    tags-ignore:
+      - '*-vk.*'
 
 env:
   DOCKERHUB_IMAGE_NAME: korotovsky/slack-mcp-server

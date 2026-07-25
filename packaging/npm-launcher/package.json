@@ -1,0 +1,28 @@
+{
+  "name": "slack-mcp-server-vk",
+  "version": "1.3.0-vk.1",
+  "description": "Launcher for the pinned fork build of slack-mcp-server used by Vibe Kanban's bundled Slack MCP catalog entry",
+  "license": "MIT",
+  "private": true,
+  "bin": {
+    "slack-mcp-server": "bin/slack-mcp-server.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "checksums.json",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davidvasandani/slack-mcp-server.git",
+    "directory": "packaging/npm-launcher"
+  },
+  "homepage": "https://github.com/davidvasandani/slack-mcp-server#readme"
+}
