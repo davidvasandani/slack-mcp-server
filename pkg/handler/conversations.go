@@ -133,12 +133,16 @@ type markParams struct {
 }
 type ConversationsHandler struct {
 	apiProvider *provider.ApiProvider
+	slack       provider.SlackAPI
+	isReady     func() (bool, error)
 	logger      *zap.Logger
 }
 
 func NewConversationsHandler(apiProvider *provider.ApiProvider, logger *zap.Logger) *ConversationsHandler {
 	return &ConversationsHandler{
 		apiProvider: apiProvider,
+		slack:       apiProvider.Slack(),
+		isReady:     apiProvider.IsReady,
 		logger:      logger,
 	}
 }
@@ -422,9 +426,9 @@ func (ch *ConversationsHandler) UsersSearchHandler(ctx context.Context, request 
 }
 
 func (ch *ConversationsHandler) FilesGetHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	ch.logger.Debug("FilesGetHandler called", zap.Any("params", request.Params))
+	ch.logger.Debug("FilesGetHandler called")
 
-	if ready, err := ch.apiProvider.IsReady(); !ready {
+	if ready, err := ch.isReady(); !ready {
 		ch.logger.Error("API provider not ready", zap.Error(err))
 		return nil, err
 	}
@@ -435,14 +439,31 @@ func (ch *ConversationsHandler) FilesGetHandler(ctx context.Context, request mcp
 		return nil, err
 	}
 
-	fileInfo, _, _, err := ch.apiProvider.Slack().GetFileInfoContext(ctx, params.fileID, 0, 0)
+	fileInfo, _, _, err := ch.slack.GetFileInfoContext(ctx, params.fileID, 0, 0)
 	if err != nil {
-		ch.logger.Error("Slack GetFileInfoContext failed", zap.Error(err))
-		return nil, err
+		ch.logger.Debug("Slack file metadata request failed", zap.String("file_id", params.fileID))
+		return nil, mapSlackFileError(err, params.fileID)
+	}
+
+	if fileInfo.Mode == "external" {
+		return nil, fmt.Errorf(
+			"file %q (MIME type: %s) is externally hosted and cannot be retrieved through this tool",
+			fileInfo.Name, fileInfo.Mimetype,
+		)
 	}
 
 	if fileInfo.Size > maxFileSizeBytes {
-		return nil, fmt.Errorf("file size %d bytes exceeds maximum allowed size of %d bytes", fileInfo.Size, maxFileSizeBytes)
+		return nil, fmt.Errorf(
+			"file %q (MIME type: %s, size: %d bytes) exceeds the maximum retrievable size of %d bytes",
+			fileInfo.Name, fileInfo.Mimetype, fileInfo.Size, maxFileSizeBytes,
+		)
+	}
+
+	if strings.TrimSpace(fileInfo.Mimetype) == "" {
+		return nil, fmt.Errorf(
+			"file %q has unsupported MIME type %q and cannot be retrieved",
+			fileInfo.Name, fileInfo.Mimetype,
+		)
 	}
 
 	var buf bytes.Buffer
@@ -454,10 +475,21 @@ func (ch *ConversationsHandler) FilesGetHandler(ctx context.Context, request mcp
 		return nil, errors.New("file has no downloadable URL")
 	}
 
-	err = ch.apiProvider.Slack().GetFileContext(ctx, downloadURL, &buf)
+	writer := &limitedWriter{buf: &buf, limit: maxFileSizeBytes}
+	err = ch.slack.GetFileContext(ctx, downloadURL, writer)
 	if err != nil {
-		ch.logger.Error("Slack GetFileContext failed", zap.Error(err))
-		return nil, err
+		if errors.Is(err, errDownloadSizeExceeded) {
+			return nil, fmt.Errorf(
+				"file %q content exceeded the maximum retrievable size of %d bytes during download",
+				fileInfo.Name, maxFileSizeBytes,
+			)
+		}
+		safeError := sanitizeDownloadError(err)
+		ch.logger.Debug("Slack file download failed",
+			zap.String("file_id", fileInfo.ID),
+			zap.String("error", safeError),
+		)
+		return nil, fmt.Errorf("failed to download file content: %s; check permissions or retry", safeError)
 	}
 
 	content := buf.Bytes()
@@ -603,6 +635,18 @@ func (ch *ConversationsHandler) ConversationsRepliesHandler(ctx context.Context,
 
 func (ch *ConversationsHandler) ConversationsSearchHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	ch.logger.Debug("ConversationsSearchHandler called", zap.Any("params", request.Params))
+
+	if permalink, ok := parseSlackMessagePermalink(strings.TrimSpace(request.GetString("search_query", ""))); ok {
+		message, err := ch.getMessageByPermalink(ctx, permalink)
+		if err != nil {
+			return nil, err
+		}
+		messages := ch.convertMessagesFromHistory(ctx, []slack.Message{message}, permalink.channelID, true)
+		if len(messages) == 1 {
+			messages[0].Permalink = strings.TrimSpace(request.GetString("search_query", ""))
+		}
+		return marshalMessagesToCSV(messages)
+	}
 
 	params, err := ch.parseParamsToolSearch(ctx, request)
 	if err != nil {
@@ -1581,18 +1625,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			botName = msg.BotProfile.Name
 		}
 
-		fileCount := len(msg.Files)
-		hasMedia := fileCount > 0 || hasImageBlocks(msg.Blocks)
-
-		var attachmentIDs []string
-		for _, f := range msg.Files {
-			if f.Name != "" {
-				attachmentIDs = append(attachmentIDs, fmt.Sprintf("%s (%s)", f.ID, f.Name))
-			} else {
-				attachmentIDs = append(attachmentIDs, f.ID)
-			}
-		}
-		attachmentIDsStr := strings.Join(attachmentIDs, ", ")
+		fileCount, attachmentIDsStr, hasMedia := messageFileMetadata(msg.Files, msg.Blocks)
 
 		messages = append(messages, Message{
 			MsgID:         msg.Timestamp,
@@ -1611,7 +1644,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 		})
 	}
 
-	if ready, err := ch.apiProvider.IsReady(); !ready {
+	if ready, err := ch.isReady(); !ready {
 		if warn && errors.Is(err, provider.ErrUsersNotReady) {
 			ch.logger.Warn(
 				"WARNING: Slack users sync is not ready yet, you may experience some limited functionality and see UIDs instead of resolved names as well as unable to query users by their @handles. Users sync is part of channels sync and operations on channels depend on users collection (IM, MPIM). Please wait until users are synced and try again",
@@ -1620,6 +1653,18 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 		}
 	}
 	return messages
+}
+
+func messageFileMetadata(files []slack.File, blocks slack.Blocks) (int, string, bool) {
+	attachmentIDs := make([]string, 0, len(files))
+	for _, file := range files {
+		if file.Name != "" {
+			attachmentIDs = append(attachmentIDs, fmt.Sprintf("%s (%s)", file.ID, file.Name))
+		} else {
+			attachmentIDs = append(attachmentIDs, file.ID)
+		}
+	}
+	return len(files), strings.Join(attachmentIDs, ", "), len(files) > 0 || hasImageBlocks(blocks)
 }
 
 func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, slackMessages []slack.SearchMessage) []Message {
@@ -1669,7 +1714,7 @@ func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, s
 		})
 	}
 
-	if ready, err := ch.apiProvider.IsReady(); !ready {
+	if ready, err := ch.isReady(); !ready {
 		if warn && errors.Is(err, provider.ErrUsersNotReady) {
 			ch.logger.Warn(
 				"Slack users sync not ready; you may see raw UIDs instead of names and lose some functionality.",
@@ -1890,27 +1935,12 @@ func (ch *ConversationsHandler) parseParamsToolReaction(ctx context.Context, req
 }
 
 func (ch *ConversationsHandler) parseParamsToolFilesGet(request mcp.CallToolRequest) (*filesGetParams, error) {
-	toolConfig := os.Getenv("SLACK_MCP_ATTACHMENT_TOOL")
-	enabledTools := os.Getenv("SLACK_MCP_ENABLED_TOOLS")
-
-	if toolConfig == "" {
-		if !strings.Contains(enabledTools, "attachment_get_data") {
-			ch.logger.Error("Attachment tool disabled by default")
-			return nil, errors.New(
-				"by default, the attachment_get_data tool is disabled. " +
-					"To enable it, set the SLACK_MCP_ATTACHMENT_TOOL environment variable to true or 1",
-			)
-		}
-		toolConfig = "true"
-	}
-	if toolConfig != "true" && toolConfig != "1" && toolConfig != "yes" {
-		ch.logger.Error("Attachment tool disabled", zap.String("config", toolConfig))
-		return nil, errors.New("SLACK_MCP_ATTACHMENT_TOOL must be set to 'true', '1', or 'yes' to enable")
-	}
-
-	fileID := request.GetString("file_id", "")
+	fileID := strings.TrimSpace(request.GetString("file_id", ""))
 	if fileID == "" {
 		return nil, errors.New("file_id is required")
+	}
+	if !fileIDRegex.MatchString(fileID) {
+		return nil, errors.New("invalid file_id format: must be 'F' followed by uppercase letters or digits (for example F1234ABCD)")
 	}
 
 	return &filesGetParams{
@@ -2243,6 +2273,66 @@ func extractThreadTS(rawurl string) (string, error) {
 		return "", err
 	}
 	return u.Query().Get("thread_ts"), nil
+}
+
+type slackMessagePermalink struct {
+	channelID string
+	messageTS string
+	threadTS  string
+}
+
+func parseSlackMessagePermalink(rawURL string) (slackMessagePermalink, bool) {
+	u, err := url.Parse(rawURL)
+	if err != nil || !strings.HasSuffix(strings.ToLower(u.Hostname()), ".slack.com") {
+		return slackMessagePermalink{}, false
+	}
+
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) != 3 || parts[0] != "archives" || parts[1] == "" || !strings.HasPrefix(parts[2], "p") {
+		return slackMessagePermalink{}, false
+	}
+
+	digits := strings.TrimPrefix(parts[2], "p")
+	if len(digits) <= 6 || strings.Trim(digits, "0123456789") != "" {
+		return slackMessagePermalink{}, false
+	}
+	messageTS := digits[:len(digits)-6] + "." + digits[len(digits)-6:]
+	threadTS := u.Query().Get("thread_ts")
+	if threadTS == "" {
+		threadTS = messageTS
+	}
+
+	return slackMessagePermalink{
+		channelID: parts[1],
+		messageTS: messageTS,
+		threadTS:  threadTS,
+	}, true
+}
+
+func (ch *ConversationsHandler) getMessageByPermalink(ctx context.Context, permalink slackMessagePermalink) (slack.Message, error) {
+	params := &slack.GetConversationRepliesParameters{
+		ChannelID: permalink.channelID,
+		Timestamp: permalink.threadTS,
+		Limit:     100,
+	}
+
+	for {
+		messages, hasMore, nextCursor, err := ch.slack.GetConversationRepliesContext(ctx, params)
+		if err != nil {
+			return slack.Message{}, err
+		}
+		for _, message := range messages {
+			if message.Timestamp == permalink.messageTS {
+				return message, nil
+			}
+		}
+		if !hasMore || nextCursor == "" {
+			break
+		}
+		params.Cursor = nextCursor
+	}
+
+	return slack.Message{}, errors.New("Slack message was not found or is not accessible to the connected identity")
 }
 
 func parseFlexibleDate(dateStr string) (time.Time, string, error) {
