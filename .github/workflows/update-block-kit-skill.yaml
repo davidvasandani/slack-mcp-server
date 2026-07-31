@@ -1,0 +1,49 @@
+name: Update Block Kit Skill
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-block-kit-skill
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Refresh official Block Kit schemas
+        run: python3 scripts/update-block-kit-reference.py
+
+      - name: Open update pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_BRANCH: automation/update-block-kit-skill
+        run: |
+          if git diff --quiet -- pkg/skill/slack-blockkit-ui; then
+            echo "Block Kit skill is current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$UPDATE_BRANCH"
+          git add pkg/skill/slack-blockkit-ui
+          git commit -m "Update Slack Block Kit skill"
+          git push --force origin "HEAD:$UPDATE_BRANCH"
+
+          if [ "$(gh pr list --head "$UPDATE_BRANCH" --state open --json number --jq length)" = "0" ]; then
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "$UPDATE_BRANCH" \
+              --title "Update Slack Block Kit skill" \
+              --body "Automated refresh from Slack's official Block Kit Markdown schemas: https://docs.slack.dev/reference/block-kit/"
+          fi

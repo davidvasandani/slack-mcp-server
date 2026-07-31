@@ -12,6 +12,7 @@ import (
 	"github.com/korotovsky/slack-mcp-server/pkg/handler"
 	"github.com/korotovsky/slack-mcp-server/pkg/provider"
 	"github.com/korotovsky/slack-mcp-server/pkg/server/auth"
+	mcpskill "github.com/korotovsky/slack-mcp-server/pkg/skill"
 	"github.com/korotovsky/slack-mcp-server/pkg/text"
 	"github.com/korotovsky/slack-mcp-server/pkg/version"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -125,6 +126,7 @@ func NewMCPServer(provider *provider.ApiProvider, logger *zap.Logger, enabledToo
 	)
 
 	conversationsHandler := handler.NewConversationsHandler(provider, logger)
+	mcpskill.Register(s)
 
 	if shouldAddTool(ToolConversationsHistory, enabledTools, "") {
 		s.AddTool(mcp.NewTool(ToolConversationsHistory,

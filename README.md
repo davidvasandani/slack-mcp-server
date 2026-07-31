@@ -15,7 +15,8 @@ This feature-rich Slack MCP Server has:
 - **Smart History**: Fetch messages with pagination by date (d1, 7d, 1m) or message count.
 - **Unread Messages**: Get all unread messages across channels efficiently with priority sorting (DMs > partner channels > internal), @mention filtering, and mark-as-read support.
 - **Search Messages**: Search messages in channels, threads, and DMs using various filters like date, user, and content.
-- **Safe Message Posting**: The `conversations_add_message` tool is disabled by default for safety. Enable it via an environment variable, with optional channel restrictions.
+- **Safe Rich Message Posting**: The `conversations_add_message` tool accepts plain text, Markdown, or raw Block Kit JSON and is disabled by default for safety. Enable it via an environment variable, with optional channel restrictions.
+- **Block Kit UI Skill**: An MCP prompt and resource provide current Block Kit composition guidance and official Slack schemas.
 - **DM and Group DM support**: Retrieve direct messages and group direct messages.
 - **Embedded user information**: Embed user information in messages, for better context.
 - **Cache support**: Cache users and channels for faster access.
@@ -56,8 +57,9 @@ Add a message to a public channel, private channel, or direct message (DM, or IM
 - **Parameters:**
   - `channel_id` (string, required): ID of the channel in format `Cxxxxxxxxxx` or its name starting with `#...` or `@...` aka `#general` or `@username_dm`.
   - `thread_ts` (string, optional): Unique identifier of either a thread’s parent message or a message in the thread_ts must be the timestamp in format `1234567890.123456` of an existing message with 0 or more replies. Optional, if not provided the message will be added to the channel itself, otherwise it will be added to the thread.
-  - `payload` (string, required): Message payload in specified content_type format. Example: 'Hello, world!' for text/plain or '# Hello, world!' for text/markdown.
-  - `content_type` (string, default: "text/markdown"): Content type of the message. Default is 'text/markdown'. Allowed values: 'text/markdown', 'text/plain'.
+  - `text` (string, optional with `blocks`): Message body for text/plain or text/markdown, and the notification/screen-reader fallback when `blocks` is provided.
+  - `content_type` (string, default: "text/markdown"): Allowed values are `text/markdown` and `text/plain`. Ignored when `blocks` is provided.
+  - `blocks` (string, optional): JSON-encoded Slack Block Kit array. Takes precedence over text rendering.
 
 ### 4. conversations_search_messages
 Search messages in a public channel, private channel, or direct message (DM, or IM) conversation using filters. All filters are optional, if not provided then search_query is required.
@@ -236,9 +238,22 @@ Clear all completed saved items from the "Save for Later" panel. This is a bulk 
 
 - **Parameters:** None.
 
-## Resources
+## Block Kit skill and resources
 
-The Slack MCP Server exposes two special directory resources for easy access to workspace metadata:
+The MCP server exposes the reusable `slack_blockkit_ui` prompt for designing
+valid, accessible Block Kit JSON. Its optional `task` argument describes the UI
+to build. The same instructions and current official schema index are available
+at `slack://skills/slack-blockkit-ui`; individual generated schemas are exposed
+through `slack://skills/slack-blockkit-ui/schemas/<name>`.
+
+The schemas are generated from Slack's official
+[Block Kit reference](https://docs.slack.dev/reference/block-kit/). A daily
+workflow refreshes them and opens a pull request whenever the upstream reference
+changes.
+
+## Workspace resources
+
+The Slack MCP Server also exposes two directory resources for workspace metadata:
 
 ### 1. `slack://<workspace>/channels` — Directory of Channels
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slack Block Kit UI"
+  short_description: "Build current, valid Slack Block Kit messages"
+  default_prompt: "Use $slack-blockkit-ui to design a valid, accessible Slack Block Kit message."

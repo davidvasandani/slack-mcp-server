@@ -101,6 +101,19 @@ type addMessageParams struct {
 	blocks      []slack.Block
 }
 
+// rawBlock preserves Block Kit JSON exactly while satisfying slack.Block.
+// This keeps newly introduced Slack block types usable before slack-go adds
+// strongly typed support for them.
+type rawBlock struct {
+	raw     json.RawMessage
+	typ     slack.MessageBlockType
+	blockID string
+}
+
+func (b rawBlock) BlockType() slack.MessageBlockType { return b.typ }
+func (b rawBlock) ID() string                        { return b.blockID }
+func (b rawBlock) MarshalJSON() ([]byte, error)      { return b.raw, nil }
+
 type addReactionParams struct {
 	channel   string
 	timestamp string
@@ -1862,12 +1875,26 @@ func (ch *ConversationsHandler) parseParamsToolAddMessage(ctx context.Context, r
 			}
 		}
 		if blocksJSON != nil {
-			var slackBlocks slack.Blocks
-			if err := json.Unmarshal(blocksJSON, &slackBlocks); err != nil {
+			var rawBlocks []json.RawMessage
+			if err := json.Unmarshal(blocksJSON, &rawBlocks); err != nil {
 				ch.logger.Error("Failed to parse blocks JSON", zap.Error(err))
 				return nil, fmt.Errorf("blocks must be valid Slack Block Kit JSON: %w", err)
 			}
-			blocks = slackBlocks.BlockSet
+			blocks = make([]slack.Block, 0, len(rawBlocks))
+			for i, raw := range rawBlocks {
+				var header struct {
+					Type    string `json:"type"`
+					BlockID string `json:"block_id"`
+				}
+				if err := json.Unmarshal(raw, &header); err != nil || header.Type == "" {
+					return nil, fmt.Errorf("blocks[%d] must be an object with a non-empty type", i)
+				}
+				blocks = append(blocks, rawBlock{
+					raw:     append(json.RawMessage(nil), raw...),
+					typ:     slack.MessageBlockType(header.Type),
+					blockID: header.BlockID,
+				})
+			}
 		}
 	}
 
