@@ -52,9 +52,44 @@ Alert blocks are currently only supported in modals.
 A sample alert block:
 
 *   JSON
+*   Python Slack SDK
+*   Node Slack SDK
 
 ```
 {	"blocks": [		{			"type": "alert",			"text": {				"type": "mrkdwn",				"text": "The work is mysterious and important.",				"verbatim": false			},			"level": "info"		}	]}
 ```
 
 [View in Block Kit Builder](https://app.slack.com/block-kit-builder/T29KZ003T#%7B%22type%22:%22modal%22,%22title%22:%7B%22type%22:%22plain_text%22,%22text%22:%22My%20App%22,%22emoji%22:true%7D,%22submit%22:%7B%22type%22:%22plain_text%22,%22text%22:%22Submit%22,%22emoji%22:true%7D,%22close%22:%7B%22type%22:%22plain_text%22,%22text%22:%22Cancel%22,%22emoji%22:true%7D,%22blocks%22:%5B%7B%22type%22:%22alert%22,%22text%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22The%20work%20is%20mysterious%20and%20important.%22,%22verbatim%22:false%7D,%22level%22:%22info%22%7D%5D%7D)
+
+```python
+def example01() -> AlertBlock:
+    """
+    Displays alerts, warnings, and informational messages.
+    https://docs.slack.dev/reference/block-kit/blocks/alert-block/
+
+    An informational alert.
+    """
+    block = AlertBlock(
+        text=MarkdownTextObject(text="The work is mysterious and important."),
+        level="info",
+    )
+    return block
+```
+
+```javascript
+export function example01() {
+  /**
+   * @type {import('@slack/types').AlertBlock}
+   */
+  const block = {
+    type: "alert",
+    text: {
+      type: "mrkdwn",
+      text: "The work is mysterious and important.",
+      verbatim: false,
+    },
+    level: "info",
+  };
+  return block;
+}
+```

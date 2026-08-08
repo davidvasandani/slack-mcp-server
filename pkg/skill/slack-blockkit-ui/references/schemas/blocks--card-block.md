@@ -102,9 +102,58 @@ Note that there is not currently an attribute to define the size of the card.
 A sample card block:
 
 *   JSON
+*   Node Slack SDK
 
 ```
 {	"blocks": [		{			"type": "card",			"icon": {				"type": "image",				"image_url": "https://picsum.photos/36/36",				"alt_text": "Icon"			},			"title": {				"type": "mrkdwn",				"text": "Lumon Industries",				"verbatim": false			},			"subtitle": {				"type": "mrkdwn",				"text": "Committed to work-life balance",				"verbatim": false			},			"hero_image": {				"type": "image",				"image_url": "https://picsum.photos/400/300",				"alt_text": "Sample hero image"			},			"body": {				"type": "mrkdwn",				"text": "Please enjoy each card equally.",				"verbatim": false			},			"actions": [				{					"type": "button",					"text": {						"type": "plain_text",						"text": "Action Button",						"emoji": false					},					"action_id": "button_action"				}			]		}	]}
 ```
 
 [View in Block Kit Builder](https://app.slack.com/block-kit-builder/T29KZ003T#%7B%22blocks%22:%5B%7B%22type%22:%22card%22,%22icon%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/36/36%22,%22alt_text%22:%22Sample%20icon%22%7D,%22title%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Lumon%20Industries%22,%22verbatim%22:false%7D,%22subtitle%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Committed%20to%20work-life%20balance%22,%22verbatim%22:false%7D,%22hero_image%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/400/300%22,%22alt_text%22:%22Sample%20hero%20image%22%7D,%22body%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Please%20enjoy%20each%20card%20equally.%22,%22verbatim%22:false%7D,%22actions%22:%5B%7B%22type%22:%22button%22,%22text%22:%7B%22type%22:%22plain_text%22,%22text%22:%22Action%20Button%22,%22emoji%22:false%7D,%22action_id%22:%22button_action%22%7D%5D%7D%5D%7D)
+
+```javascript
+export function example01() {
+  /**
+   * @type {import('@slack/types').CardBlock}
+   */
+  const block = {
+    type: "card",
+    icon: {
+      type: "image",
+      image_url: "https://picsum.photos/36/36",
+      alt_text: "Icon",
+    },
+    title: {
+      type: "mrkdwn",
+      text: "Lumon Industries",
+      verbatim: false,
+    },
+    subtitle: {
+      type: "mrkdwn",
+      text: "Committed to work-life balance",
+      verbatim: false,
+    },
+    hero_image: {
+      type: "image",
+      image_url: "https://picsum.photos/400/300",
+      alt_text: "Sample hero image",
+    },
+    body: {
+      type: "mrkdwn",
+      text: "Please enjoy each card equally.",
+      verbatim: false,
+    },
+    actions: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "Action Button",
+          emoji: false,
+        },
+        action_id: "button_action",
+      },
+    ],
+  };
+  return block;
+}
+```
