@@ -42,9 +42,144 @@ Optional
 A sample carousel block:
 
 *   JSON
+*   Node Slack SDK
 
 ```
 {	"blocks": [		{			"type": "carousel",			"elements": [				{					"type": "card",					"block_id": "carousel-card-1",					"icon": {						"type": "image",						"image_url": "https://picsum.photos/36/36",						"alt_text": "Icon"					},					"title": {						"type": "mrkdwn",						"text": "MDR",						"verbatim": false					},					"subtitle": {						"type": "mrkdwn",						"text": "Refining data files",						"verbatim": false					},					"hero_image": {						"type": "image",						"image_url": "https://picsum.photos/400/300",						"alt_text": "Sample hero image"					},					"body": {						"type": "mrkdwn",						"text": "Blue badge required to gain access.",						"verbatim": false					},					"actions": [						{							"type": "button",							"text": {								"type": "plain_text",								"text": "Action Button",								"emoji": false							},							"action_id": "button_action_1"						}					]				},				{					"type": "card",					"block_id": "carousel-card-2",					"icon": {						"type": "image",						"image_url": "https://picsum.photos/36/36",						"alt_text": "Icon"					},					"title": {						"type": "mrkdwn",						"text": "O&D",						"verbatim": false					},					"subtitle": {						"type": "mrkdwn",						"text": "Storage, maintenance, and rotation of art pieces",						"verbatim": false					},					"hero_image": {						"type": "image",						"image_url": "https://picsum.photos/400/300",						"alt_text": "Sample hero image"					},					"body": {						"type": "mrkdwn",						"text": "Green badge required to gain access.",						"verbatim": false					},					"actions": [						{							"type": "button",							"text": {								"type": "plain_text",								"text": "Action Button",								"emoji": false							},							"action_id": "button_action_2"						}					]				},				{					"type": "card",					"block_id": "carousel-card-3",					"icon": {						"type": "image",						"image_url": "https://picsum.photos/36/36",						"alt_text": "Icon"					},					"title": {						"type": "mrkdwn",						"text": "Wellness Center",						"verbatim": false					},					"subtitle": {						"type": "mrkdwn",						"text": "Wellness sessions",						"verbatim": false					},					"hero_image": {						"type": "image",						"image_url": "https://picsum.photos/400/300",						"alt_text": "Sample hero image"					},					"body": {						"type": "mrkdwn",						"text": "Please take a seat in the waiting room until called.",						"verbatim": false					},					"actions": [						{							"type": "button",							"text": {								"type": "plain_text",								"text": "Action Button",								"emoji": false							},							"action_id": "button_action_3"						}					]				}			]		}	]}
 ```
 
 [View in Block Kit Builder](https://app.slack.com/block-kit-builder/T29KZ003T#%7B%22blocks%22:%5B%7B%22type%22:%22carousel%22,%22elements%22:%5B%7B%22type%22:%22card%22,%22block_id%22:%22carousel-card-1%22,%22icon%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/36/36%22,%22alt_text%22:%22Icon%22%7D,%22title%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22MDR%22,%22verbatim%22:false%7D,%22subtitle%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Refining%20data%20files%22,%22verbatim%22:false%7D,%22hero_image%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/400/300%22,%22alt_text%22:%22Sample%20hero%20image%22%7D,%22body%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Blue%20badge%20required%20to%20gain%20access.%22,%22verbatim%22:false%7D,%22actions%22:%5B%7B%22type%22:%22button%22,%22text%22:%7B%22type%22:%22plain_text%22,%22text%22:%22Action%20Button%22,%22emoji%22:false%7D,%22action_id%22:%22button_action_1%22%7D%5D%7D,%7B%22type%22:%22card%22,%22block_id%22:%22carousel-card-2%22,%22icon%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/36/36%22,%22alt_text%22:%22Icon%22%7D,%22title%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22O&D%22,%22verbatim%22:false%7D,%22subtitle%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Storage,%20maintenance,%20and%20rotation%20of%20art%20pieces.%22,%22verbatim%22:false%7D,%22hero_image%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/400/300%22,%22alt_text%22:%22Sample%20hero%20image%22%7D,%22body%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Green%20badge%20required%20to%20gain%20access.%22,%22verbatim%22:false%7D,%22actions%22:%5B%7B%22type%22:%22button%22,%22text%22:%7B%22type%22:%22plain_text%22,%22text%22:%22Action%20Button%22,%22emoji%22:false%7D,%22action_id%22:%22button_action_2%22%7D%5D%7D,%7B%22type%22:%22card%22,%22block_id%22:%22carousel-card-3%22,%22icon%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/36/36%22,%22alt_text%22:%22Icon%22%7D,%22title%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Wellness%20Center%22,%22verbatim%22:false%7D,%22subtitle%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Wellness%20sessions%22,%22verbatim%22:false%7D,%22hero_image%22:%7B%22type%22:%22image%22,%22image_url%22:%22https://picsum.photos/400/300%22,%22alt_text%22:%22Sample%20hero%20image%22%7D,%22body%22:%7B%22type%22:%22mrkdwn%22,%22text%22:%22Please%20take%20a%20seat%20in%20the%20waiting%20room%20until%20called.%22,%22verbatim%22:false%7D,%22actions%22:%5B%7B%22type%22:%22button%22,%22text%22:%7B%22type%22:%22plain_text%22,%22text%22:%22Action%20Button%22,%22emoji%22:false%7D,%22action_id%22:%22button_action_3%22%7D%5D%7D%5D%7D%5D%7D)
+
+```javascript
+export function example01() {
+  /**
+   * @type {import('@slack/types').CarouselBlock}
+   */
+  const block = {
+    type: "carousel",
+    elements: [
+      {
+        type: "card",
+        block_id: "carousel-card-1",
+        icon: {
+          type: "image",
+          image_url: "https://picsum.photos/36/36",
+          alt_text: "Icon",
+        },
+        title: {
+          type: "mrkdwn",
+          text: "MDR",
+          verbatim: false,
+        },
+        subtitle: {
+          type: "mrkdwn",
+          text: "Refining data files",
+          verbatim: false,
+        },
+        hero_image: {
+          type: "image",
+          image_url: "https://picsum.photos/400/300",
+          alt_text: "Sample hero image",
+        },
+        body: {
+          type: "mrkdwn",
+          text: "Blue badge required to gain access.",
+          verbatim: false,
+        },
+        actions: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Action Button",
+              emoji: false,
+            },
+            action_id: "button_action_1",
+          },
+        ],
+      },
+      {
+        type: "card",
+        block_id: "carousel-card-2",
+        icon: {
+          type: "image",
+          image_url: "https://picsum.photos/36/36",
+          alt_text: "Icon",
+        },
+        title: {
+          type: "mrkdwn",
+          text: "O&D",
+          verbatim: false,
+        },
+        subtitle: {
+          type: "mrkdwn",
+          text: "Storage, maintenance, and rotation of art pieces",
+          verbatim: false,
+        },
+        hero_image: {
+          type: "image",
+          image_url: "https://picsum.photos/400/300",
+          alt_text: "Sample hero image",
+        },
+        body: {
+          type: "mrkdwn",
+          text: "Green badge required to gain access.",
+          verbatim: false,
+        },
+        actions: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Action Button",
+              emoji: false,
+            },
+            action_id: "button_action_2",
+          },
+        ],
+      },
+      {
+        type: "card",
+        block_id: "carousel-card-3",
+        icon: {
+          type: "image",
+          image_url: "https://picsum.photos/36/36",
+          alt_text: "Icon",
+        },
+        title: {
+          type: "mrkdwn",
+          text: "Wellness Center",
+          verbatim: false,
+        },
+        subtitle: {
+          type: "mrkdwn",
+          text: "Wellness sessions",
+          verbatim: false,
+        },
+        hero_image: {
+          type: "image",
+          image_url: "https://picsum.photos/400/300",
+          alt_text: "Sample hero image",
+        },
+        body: {
+          type: "mrkdwn",
+          text: "Please take a seat in the waiting room until called.",
+          verbatim: false,
+        },
+        actions: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Action Button",
+              emoji: false,
+            },
+            action_id: "button_action_3",
+          },
+        ],
+      },
+    ],
+  };
+  return block;
+}
+```
