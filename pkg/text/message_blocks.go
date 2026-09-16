@@ -21,7 +21,13 @@ func MessageBlocksToText(blocks slack.Blocks) string {
 			rendered.BlockSet = append(rendered.BlockSet, block)
 		}
 	}
-	return BlocksToText(rendered)
+	var parts []string
+	for _, block := range rendered.BlockSet {
+		if body := BlocksToText(slack.Blocks{BlockSet: []slack.Block{block}}); body != "" {
+			parts = append(parts, body)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func messageRichElement(element slack.RichTextElement) string {

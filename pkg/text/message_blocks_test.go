@@ -27,3 +27,13 @@ func TestUnitMessageRichBlocksKeepContent(t *testing.T) {
 func TestUnitMessageTextPreservesFormattingAndFiltersControls(t *testing.T) {
 	require.Equal(t, "  café 👩‍💻\n\t{  x  }\r\n", MessageText("\x00  café 👩‍💻\n\t{  x  }\u202e\r\n"))
 }
+
+func TestUnitMessageBlockBoundaries(t *testing.T) {
+	blocks := slack.Blocks{BlockSet: []slack.Block{
+		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "1. first", false, false), nil, nil),
+		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "2. second", false, false), nil, nil),
+		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "```json\n{\n  \"a\": 1\n}\n```", false, false), nil, nil),
+		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "Next step", false, false), nil, nil),
+	}}
+	require.Equal(t, "1. first\n2. second\n```json\n{\n  \"a\": 1\n}\n```\nNext step", MessageBlocksToText(blocks))
+}
