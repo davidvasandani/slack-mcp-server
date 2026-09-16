@@ -12,13 +12,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/korotovsky/slack-mcp-server/pkg/provider"
 	"github.com/korotovsky/slack-mcp-server/pkg/test/util"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/responses"
+	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestIntegrationConversations(t *testing.T) {
@@ -649,6 +653,54 @@ func TestUnitIsSlackUserIDPrefix(t *testing.T) {
 			got := isSlackUserIDPrefix(tt.s)
 			if got != tt.want {
 				t.Errorf("isSlackUserIDPrefix(%q) = %v, want %v", tt.s, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnitMessageReadFidelity(t *testing.T) {
+	long := "  *Tool failure*\n" + strings.Repeat("Unicode café 漢字 🚀\n", 60) + "| Tool | Result |\n| brink__list_locations | denied |\n```json\n{\"next\": \"retry\", \"indent\": \"  two\"}\n```\n\tfinal  line  "
+	blocks := slack.Blocks{BlockSet: []slack.Block{slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", long, false, false), nil, nil)}}
+	for _, tc := range []struct {
+		name, fallback string
+		blocks         slack.Blocks
+	}{
+		{"plain long", long, slack.Blocks{}},
+		{"notification fallback", long[:200] + "...", blocks},
+		{"search without fallback", "", blocks},
+		{"literal ellipsis", "This really ends...", slack.Blocks{}},
+		{"empty", "", slack.Blocks{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Empty user avoids network identity lookups; provider still owns ready caches.
+			t.Setenv("SLACK_MCP_XOXP_TOKEN", "demo")
+			ap := provider.New("stdio", zap.NewNop())
+			ap.SkipCache()
+			h := NewConversationsHandler(ap, zap.NewNop())
+			history := h.convertMessagesFromHistory(context.Background(), []slack.Message{{Msg: slack.Msg{Timestamp: "1789533901.711679", Text: tc.fallback, Blocks: tc.blocks}}}, "C123", true)
+			searchText := tc.fallback
+			if len(tc.blocks.BlockSet) > 0 {
+				searchText = ""
+			}
+			search := h.convertMessagesFromSearch(context.Background(), []slack.SearchMessage{{Timestamp: "1789533901.711679", Text: searchText, Blocks: tc.blocks}})
+			require.Len(t, history, 1)
+			require.Len(t, search, 1)
+			expected := tc.fallback
+			if len(tc.blocks.BlockSet) > 0 {
+				expected = long
+			}
+			require.Equal(t, expected, history[0].Text)
+			require.Equal(t, history[0].Text, search[0].Text)
+			for _, messages := range [][]Message{history, search} {
+				result, err := marshalMessagesToCSV(messages)
+				require.NoError(t, err)
+				rows, err := csv.NewReader(strings.NewReader(result.Content[0].(mcp.TextContent).Text)).ReadAll()
+				require.NoError(t, err)
+				for i, col := range rows[0] {
+					if col == "Text" {
+						require.Equal(t, expected, rows[1][i])
+					}
+				}
 			}
 		})
 	}

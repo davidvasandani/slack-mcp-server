@@ -1618,10 +1618,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			continue
 		}
 
-		msgText := msg.Text
-		if msgText == "" {
-			msgText = text.BlocksToText(msg.Blocks)
-		}
+		msgText := messageBody(msg.Text, msg.Blocks)
 		if msgText == "" {
 			msgText = text.FilesToText(msg.Files)
 		}
@@ -1645,7 +1642,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			UserID:        msg.User,
 			UserName:      userName,
 			RealName:      realName,
-			Text:          text.ProcessText(msgText),
+			Text:          msgText,
 			Channel:       channel,
 			ThreadTs:      msg.ThreadTimestamp,
 			Time:          timestamp,
@@ -1704,10 +1701,7 @@ func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, s
 			continue
 		}
 
-		msgText := msg.Text
-		if msgText == "" {
-			msgText = text.BlocksToText(msg.Blocks)
-		}
+		msgText := messageBody(msg.Text, msg.Blocks)
 		msgText += text.AttachmentsTo2CSV(msgText, msg.Attachments)
 
 		hasMedia := hasImageBlocks(msg.Blocks)
@@ -1717,7 +1711,7 @@ func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, s
 			UserID:    msg.User,
 			UserName:  userName,
 			RealName:  realName,
-			Text:      text.ProcessText(msgText),
+			Text:      msgText,
 			Channel:   fmt.Sprintf("%s (#%s)", msg.Channel.ID, msg.Channel.Name),
 			ThreadTs:  threadTs,
 			Time:      timestamp,
@@ -2574,4 +2568,24 @@ func hasImageBlocks(blocks slack.Blocks) bool {
 		}
 	}
 	return false
+}
+
+// messageBody shares Block Kit selection across history, replies, and search.
+// Prefer layout blocks, whose text is the rendered message rather than the
+// abbreviated notification fallback. Rich-text-only messages retain Slack's
+// authoritative text representation (mentions and formatting included).
+func messageBody(fallback string, blocks slack.Blocks) string {
+	hasLayout := false
+	for _, block := range blocks.BlockSet {
+		switch block.(type) {
+		case *slack.SectionBlock, *slack.HeaderBlock:
+			hasLayout = true
+		}
+	}
+	if hasLayout || fallback == "" {
+		if body := text.BlocksToText(blocks); body != "" {
+			return body
+		}
+	}
+	return fallback
 }
