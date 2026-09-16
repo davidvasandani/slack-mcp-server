@@ -59,6 +59,7 @@ type Message struct {
 	FileCount     int    `json:"fileCount,omitempty"`
 	AttachmentIDs string `json:"attachmentIDs,omitempty"`
 	HasMedia      bool   `json:"hasMedia,omitempty"`
+	FallbackText  string `json:"fallbackText,omitempty"`
 	Cursor        string `json:"cursor"`
 }
 
@@ -1643,6 +1644,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			UserName:      userName,
 			RealName:      realName,
 			Text:          text.MessageText(msgText),
+			FallbackText:  messageFallback(msg.Text, msgText),
 			Channel:       channel,
 			ThreadTs:      msg.ThreadTimestamp,
 			Time:          timestamp,
@@ -1707,17 +1709,18 @@ func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, s
 		hasMedia := hasImageBlocks(msg.Blocks)
 
 		messages = append(messages, Message{
-			MsgID:     msg.Timestamp,
-			UserID:    msg.User,
-			UserName:  userName,
-			RealName:  realName,
-			Text:      text.MessageText(msgText),
-			Channel:   fmt.Sprintf("%s (#%s)", msg.Channel.ID, msg.Channel.Name),
-			ThreadTs:  threadTs,
-			Time:      timestamp,
-			Permalink: msg.Permalink,
-			Reactions: "",
-			HasMedia:  hasMedia,
+			MsgID:        msg.Timestamp,
+			UserID:       msg.User,
+			UserName:     userName,
+			RealName:     realName,
+			Text:         text.MessageText(msgText),
+			FallbackText: messageFallback(msg.Text, msgText),
+			Channel:      fmt.Sprintf("%s (#%s)", msg.Channel.ID, msg.Channel.Name),
+			ThreadTs:     threadTs,
+			Time:         timestamp,
+			Permalink:    msg.Permalink,
+			Reactions:    "",
+			HasMedia:     hasMedia,
 		})
 	}
 
@@ -2586,6 +2589,15 @@ func messageBody(fallback string, blocks slack.Blocks) string {
 		if body := text.MessageBlocksToText(blocks); body != "" {
 			return body
 		}
+	}
+	return fallback
+}
+
+// Retain distinct fallback context without doubling every plain message body.
+func messageFallback(fallback, body string) string {
+	fallback = text.MessageText(fallback)
+	if fallback == text.MessageText(body) {
+		return ""
 	}
 	return fallback
 }

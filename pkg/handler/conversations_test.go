@@ -690,7 +690,17 @@ func TestUnitMessageReadFidelity(t *testing.T) {
 				expected = long
 			}
 			require.Equal(t, expected, history[0].Text)
+			expectedFallback := tc.fallback
+			if expectedFallback == expected {
+				expectedFallback = ""
+			}
+			require.Equal(t, expectedFallback, history[0].FallbackText)
 			require.Equal(t, history[0].Text, search[0].Text)
+			expectedSearchFallback := searchText
+			if expectedSearchFallback == expected {
+				expectedSearchFallback = ""
+			}
+			require.Equal(t, expectedSearchFallback, search[0].FallbackText)
 			for _, messages := range [][]Message{history, search} {
 				result, err := marshalMessagesToCSV(messages)
 				require.NoError(t, err)
@@ -703,5 +713,27 @@ func TestUnitMessageReadFidelity(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUnitLayoutRetainsAdditionalFallbackContext(t *testing.T) {
+	t.Setenv("SLACK_MCP_XOXP_TOKEN", "demo")
+	ap := provider.New("stdio", zap.NewNop())
+	ap.SkipCache()
+	h := NewConversationsHandler(ap, zap.NewNop())
+	fallback := "Review at https://example.com/action"
+	blocks := slack.Blocks{BlockSet: []slack.Block{slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", "Review", false, false), nil, nil)}}
+	history := h.convertMessagesFromHistory(context.Background(), []slack.Message{{Msg: slack.Msg{Timestamp: "1789533901.711679", Text: fallback, Blocks: blocks}}}, "C123", true)
+	require.Equal(t, "Review", history[0].Text)
+	require.Equal(t, fallback, history[0].FallbackText)
+	result, err := marshalMessagesToCSV(history)
+	require.NoError(t, err)
+	rows, err := csv.NewReader(strings.NewReader(result.Content[0].(mcp.TextContent).Text)).ReadAll()
+	require.NoError(t, err)
+	require.Equal(t, "Cursor", rows[0][len(rows[0])-1])
+	for i, key := range rows[0] {
+		if key == "FallbackText" {
+			require.Equal(t, fallback, rows[1][i])
+		}
 	}
 }
