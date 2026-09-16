@@ -86,3 +86,30 @@ func TestUnitEmailScopeErrorDoesNotExposeToken(t *testing.T) {
 	require.Error(t, err)
 	require.False(t, strings.Contains(err.Error(), "xoxp-secret-fixture"))
 }
+
+func TestUnitEmailProfileRetryAndCache(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ok":true,"user":{"id":"U123","profile":{}}}`))
+	}))
+	defer server.Close()
+	client := &MCPSlackClient{slackClient: slack.New("test", slack.OptionAPIURL(server.URL+"/"), slack.OptionHTTPClient(server.Client()))}
+	for range 2 {
+		user, err := client.emailProfile(context.Background(), "U123")
+		require.NoError(t, err)
+		require.Equal(t, "U123", user.ID)
+		require.Empty(t, user.Profile.Email, "a genuinely absent email remains valid after scope verification")
+	}
+	require.Equal(t, 2, calls, "retry respects Retry-After and successful empty-email profiles are cached")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := client.emailProfile(ctx, "U456")
+	require.ErrorIs(t, err, context.Canceled)
+}

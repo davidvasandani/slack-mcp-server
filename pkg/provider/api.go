@@ -262,8 +262,11 @@ type SlackAPI interface {
 }
 
 type MCPSlackClient struct {
-	slackClient *slack.Client
-	edgeClient  *edge.Client
+	emailProfiles    sync.Map
+	emailLimiterOnce sync.Once
+	emailLimiter     *rate.Limiter
+	slackClient      *slack.Client
+	edgeClient       *edge.Client
 
 	authResponse *slack.AuthTestResponse
 	authProvider auth.Provider
@@ -1412,7 +1415,7 @@ func (ap *ApiProvider) SearchUsers(ctx context.Context, query string, limit int)
 			return []slack.User{*user}, nil
 		}
 		if slackUserIDPattern.MatchString(query) {
-			user, err := client.slackClient.GetUserInfoContext(ctx, query)
+			user, err := client.emailProfile(ctx, query)
 			if err != nil {
 				return nil, err
 			}
@@ -1424,7 +1427,7 @@ func (ap *ApiProvider) SearchUsers(ctx context.Context, query string, limit int)
 		}
 		// Refresh matched profiles so a scope upgrade cannot leave blank cached emails.
 		for i := range users {
-			user, err := client.slackClient.GetUserInfoContext(ctx, users[i].ID)
+			user, err := client.emailProfile(ctx, users[i].ID)
 			if err != nil {
 				return nil, err
 			}

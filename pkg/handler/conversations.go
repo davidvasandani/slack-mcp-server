@@ -1642,7 +1642,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			UserID:        msg.User,
 			UserName:      userName,
 			RealName:      realName,
-			Text:          msgText,
+			Text:          text.MessageText(msgText),
 			Channel:       channel,
 			ThreadTs:      msg.ThreadTimestamp,
 			Time:          timestamp,
@@ -1711,7 +1711,7 @@ func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, s
 			UserID:    msg.User,
 			UserName:  userName,
 			RealName:  realName,
-			Text:      msgText,
+			Text:      text.MessageText(msgText),
 			Channel:   fmt.Sprintf("%s (#%s)", msg.Channel.ID, msg.Channel.Name),
 			ThreadTs:  threadTs,
 			Time:      timestamp,
@@ -2583,7 +2583,7 @@ func messageBody(fallback string, blocks slack.Blocks) string {
 		}
 	}
 	if hasLayout || fallback == "" {
-		if body := text.BlocksToText(blocks); body != "" {
+		if body := text.MessageBlocksToText(blocks); body != "" {
 			return body
 		}
 	}
