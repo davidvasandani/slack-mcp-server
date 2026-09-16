@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM build AS dev
 
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go install github.com/go-delve/delve/cmd/dlv@v1.25.0 && cp /go/bin/dlv /dlv
+    go install github.com/go-delve/delve/cmd/dlv@v1.26.0 && cp /go/bin/dlv /dlv
 
 WORKDIR /app/mcp-server
 
