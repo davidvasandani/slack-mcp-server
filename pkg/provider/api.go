@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -156,6 +157,7 @@ func validateAuthAndGetTeamID(authProvider auth.Provider, logger *zap.Logger) (s
 	}
 
 	httpClient := transport.ProvideHTTPClient(authProvider.Cookies(), logger)
+	httpClient.Transport = emailScopeTransport{next: httpClient.Transport}
 	slackOpts := []slack.Option{slack.OptionHTTPClient(httpClient)}
 	if os.Getenv("SLACK_MCP_GOVSLACK") == "true" {
 		slackOpts = append(slackOpts, slack.OptionAPIURL("https://slack-gov.com/api/"))
@@ -260,8 +262,11 @@ type SlackAPI interface {
 }
 
 type MCPSlackClient struct {
-	slackClient *slack.Client
-	edgeClient  *edge.Client
+	emailProfiles    sync.Map
+	emailLimiterOnce sync.Once
+	emailLimiter     *rate.Limiter
+	slackClient      *slack.Client
+	edgeClient       *edge.Client
 
 	authResponse *slack.AuthTestResponse
 	authProvider auth.Provider
@@ -303,6 +308,7 @@ type ApiProvider struct {
 
 func NewMCPSlackClient(authProvider auth.Provider, logger *zap.Logger) (*MCPSlackClient, error) {
 	httpClient := transport.ProvideHTTPClient(authProvider.Cookies(), logger)
+	httpClient.Transport = emailScopeTransport{next: httpClient.Transport}
 
 	slackOpts := []slack.Option{slack.OptionHTTPClient(httpClient)}
 	if os.Getenv("SLACK_MCP_GOVSLACK") == "true" {
@@ -1392,6 +1398,44 @@ var slackUserIDPattern = regexp.MustCompile(`^[UW][A-Z0-9]{2,}$`)
 // For OAuth tokens (xoxp/xoxb), it searches the local users cache using regex matching.
 // For browser tokens (xoxc/xoxd), it uses the edge API's UsersSearch method.
 func (ap *ApiProvider) SearchUsers(ctx context.Context, query string, limit int) ([]slack.User, error) {
+	if ap.IsOAuth() {
+		client := ap.client.(*MCPSlackClient)
+		if err := client.requireEmailScope(ctx); err != nil {
+			return nil, err
+		}
+		// Exact addresses bypass the users cache, which may predate reauthorization.
+		if address, err := mail.ParseAddress(query); err == nil && address.Address == query {
+			user, err := client.slackClient.GetUserByEmailContext(ctx, query)
+			if err != nil {
+				if err.Error() == "users_not_found" {
+					return nil, nil
+				}
+				return nil, err
+			}
+			return []slack.User{*user}, nil
+		}
+		if slackUserIDPattern.MatchString(query) {
+			user, err := client.emailProfile(ctx, query)
+			if err != nil {
+				return nil, err
+			}
+			return []slack.User{*user}, nil
+		}
+		users, err := ap.searchUsersInCache(query, limit)
+		if err != nil {
+			return nil, err
+		}
+		// Refresh matched profiles so a scope upgrade cannot leave blank cached emails.
+		for i := range users {
+			user, err := client.emailProfile(ctx, users[i].ID)
+			if err != nil {
+				return nil, err
+			}
+			users[i] = *user
+		}
+		return users, nil
+	}
+
 	if slackUserIDPattern.MatchString(query) {
 		users, err := ap.client.GetUsersInfo(query)
 		if err != nil {
@@ -1401,10 +1445,6 @@ func (ap *ApiProvider) SearchUsers(ctx context.Context, query string, limit int)
 			return *users, nil
 		}
 		return nil, nil
-	}
-
-	if ap.IsOAuth() {
-		return ap.searchUsersInCache(query, limit)
 	}
 
 	return ap.client.UsersSearch(ctx, query, limit)

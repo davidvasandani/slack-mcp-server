@@ -45,6 +45,7 @@ Instead of using browser-based tokens (`xoxc`/`xoxd`), you can use a User OAuth 
     - `mpim:read` - View basic information about group direct messages
     - `mpim:write` - Start group direct messages with people on a user’s behalf (new since `v1.1.18`)
     - `users:read` - View people in a workspace.
+    - `users:read.email` - Read profile emails and search users by email.
     - `chat:write` - Send messages on a user's behalf. (new since `v1.1.18`)
     - `search:read` - Search a workspace's content. (new since `v1.1.18`)
     - `usergroups:read` - View user groups in a workspace.
@@ -76,6 +77,7 @@ To create the app from a manifest with permissions preconfigured, use the follow
                 "mpim:read",
                 "mpim:write",
                 "users:read",
+                "users:read.email",
                 "chat:write",
                 "search:read",
                 "usergroups:read",
@@ -106,3 +108,12 @@ You can also use a Bot token instead of a User token:
 
 
 See next: [Installation](02-installation.md)
+
+### Upgrading an existing installation for email lookup
+
+Add `users:read.email` to the token's scopes, reinstall/reauthorize the app, and
+replace the runtime token before restarting the server. Editing a manifest alone
+does not grant an already-installed token new permissions. `users_search` checks
+Slack's reported OAuth scopes and returns `missing_scope: users:read.email`
+instead of a misleading empty Email column. Exact email queries and matched
+profiles are fetched live so caches from before reauthorization cannot hide emails.

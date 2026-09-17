@@ -357,3 +357,13 @@ Expose only specific tools:
 | includes tool   | not set              | Yes                    | None                |
 | includes tool   | `C123,C456`          | Yes                    | Only listed channels |
 | excludes tool   | any                  | No                     | N/A                 |
+
+### Message bodies and notification fallback
+
+History, replies, and search share the same complete layout-block renderer.
+`Text` contains the rendered message body (with block boundaries and formatting),
+without an implicit length cap. `FallbackText` retains Slack's original top-level
+notification/accessibility text when it differs from `Text`; it may contain extra context or URLs absent
+from supported layout elements. Both retain the existing unsafe-control filter.
+`Cursor` remains the final CSV column for pagination. Messages without layout
+blocks keep their top-level text; attachments and empty-text fallbacks still work.

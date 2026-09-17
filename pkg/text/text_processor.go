@@ -440,3 +440,7 @@ func stripUnsafeRunes(s string) string {
 func collapseInlineSpaces(s string) string {
 	return inlineSpaceRegex.ReplaceAllString(s, " ")
 }
+
+// MessageText preserves message formatting while retaining the existing
+// protection against terminal and bidi control characters.
+func MessageText(s string) string { return stripUnsafeRunes(s) }

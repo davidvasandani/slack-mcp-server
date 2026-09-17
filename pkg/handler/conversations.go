@@ -59,6 +59,7 @@ type Message struct {
 	FileCount     int    `json:"fileCount,omitempty"`
 	AttachmentIDs string `json:"attachmentIDs,omitempty"`
 	HasMedia      bool   `json:"hasMedia,omitempty"`
+	FallbackText  string `json:"fallbackText,omitempty"`
 	Cursor        string `json:"cursor"`
 }
 
@@ -1618,10 +1619,7 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			continue
 		}
 
-		msgText := msg.Text
-		if msgText == "" {
-			msgText = text.BlocksToText(msg.Blocks)
-		}
+		msgText := messageBody(msg.Text, msg.Blocks)
 		if msgText == "" {
 			msgText = text.FilesToText(msg.Files)
 		}
@@ -1645,7 +1643,8 @@ func (ch *ConversationsHandler) convertMessagesFromHistory(ctx context.Context, 
 			UserID:        msg.User,
 			UserName:      userName,
 			RealName:      realName,
-			Text:          text.ProcessText(msgText),
+			Text:          text.MessageText(msgText),
+			FallbackText:  messageFallback(msg.Text, msgText),
 			Channel:       channel,
 			ThreadTs:      msg.ThreadTimestamp,
 			Time:          timestamp,
@@ -1704,26 +1703,24 @@ func (ch *ConversationsHandler) convertMessagesFromSearch(ctx context.Context, s
 			continue
 		}
 
-		msgText := msg.Text
-		if msgText == "" {
-			msgText = text.BlocksToText(msg.Blocks)
-		}
+		msgText := messageBody(msg.Text, msg.Blocks)
 		msgText += text.AttachmentsTo2CSV(msgText, msg.Attachments)
 
 		hasMedia := hasImageBlocks(msg.Blocks)
 
 		messages = append(messages, Message{
-			MsgID:     msg.Timestamp,
-			UserID:    msg.User,
-			UserName:  userName,
-			RealName:  realName,
-			Text:      text.ProcessText(msgText),
-			Channel:   fmt.Sprintf("%s (#%s)", msg.Channel.ID, msg.Channel.Name),
-			ThreadTs:  threadTs,
-			Time:      timestamp,
-			Permalink: msg.Permalink,
-			Reactions: "",
-			HasMedia:  hasMedia,
+			MsgID:        msg.Timestamp,
+			UserID:       msg.User,
+			UserName:     userName,
+			RealName:     realName,
+			Text:         text.MessageText(msgText),
+			FallbackText: messageFallback(msg.Text, msgText),
+			Channel:      fmt.Sprintf("%s (#%s)", msg.Channel.ID, msg.Channel.Name),
+			ThreadTs:     threadTs,
+			Time:         timestamp,
+			Permalink:    msg.Permalink,
+			Reactions:    "",
+			HasMedia:     hasMedia,
 		})
 	}
 
@@ -2574,4 +2571,33 @@ func hasImageBlocks(blocks slack.Blocks) bool {
 		}
 	}
 	return false
+}
+
+// messageBody shares Block Kit selection across history, replies, and search.
+// Prefer layout blocks, whose text is the rendered message rather than the
+// abbreviated notification fallback. Rich-text-only messages retain Slack's
+// authoritative text representation (mentions and formatting included).
+func messageBody(fallback string, blocks slack.Blocks) string {
+	hasLayout := false
+	for _, block := range blocks.BlockSet {
+		switch block.(type) {
+		case *slack.SectionBlock, *slack.HeaderBlock:
+			hasLayout = true
+		}
+	}
+	if hasLayout || fallback == "" {
+		if body := text.MessageBlocksToText(blocks); body != "" {
+			return body
+		}
+	}
+	return fallback
+}
+
+// Retain distinct fallback context without doubling every plain message body.
+func messageFallback(fallback, body string) string {
+	fallback = text.MessageText(fallback)
+	if fallback == text.MessageText(body) {
+		return ""
+	}
+	return fallback
 }

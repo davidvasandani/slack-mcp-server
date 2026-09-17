@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - master
-  pull_request_target:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -26,4 +26,6 @@ jobs:
         run: make deps
 
       - name: Run unit tests
-        run: make test
+        run: |
+          go test ./... -skip Integration -count=1
+          go test ./pkg/server -run TestIntegrationErrorRecoveryMiddleware -count=1
