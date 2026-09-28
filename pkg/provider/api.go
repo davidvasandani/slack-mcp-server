@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/mail"
 	"os"
 	"path/filepath"
@@ -259,6 +260,10 @@ type SlackAPI interface {
 	CreateUserGroupContext(ctx context.Context, userGroup slack.UserGroup, options ...slack.CreateUserGroupOption) (slack.UserGroup, error)
 	UpdateUserGroupContext(ctx context.Context, userGroupID string, options ...slack.UpdateUserGroupsOption) (slack.UserGroup, error)
 	UpdateUserGroupMembersContext(ctx context.Context, userGroup string, members string, options ...slack.UpdateUserGroupMembersOption) (slack.UserGroup, error)
+
+	// Canvas API methods
+	EditCanvasContext(ctx context.Context, canvasID string, change CanvasChange) error
+	LookupCanvasSectionsContext(ctx context.Context, canvasID string, criteria CanvasSectionCriteria) ([]string, error)
 }
 
 type MCPSlackClient struct {
@@ -267,6 +272,8 @@ type MCPSlackClient struct {
 	emailLimiter     *rate.Limiter
 	slackClient      *slack.Client
 	edgeClient       *edge.Client
+	httpClient       *http.Client
+	apiURL           string
 
 	authResponse *slack.AuthTestResponse
 	authProvider auth.Provider
@@ -356,6 +363,8 @@ func NewMCPSlackClient(authProvider auth.Provider, logger *zap.Logger) (*MCPSlac
 	return &MCPSlackClient{
 		slackClient:  slackClient,
 		edgeClient:   edgeClient,
+		httpClient:   httpClient,
+		apiURL:       authResp.URL + "api/",
 		authResponse: authResponse,
 		authProvider: authProvider,
 		isEnterprise: isEnterprise,

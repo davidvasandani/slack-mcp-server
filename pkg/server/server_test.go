@@ -117,6 +117,8 @@ func TestValidToolNames(t *testing.T) {
 			ToolSavedList:                   true,
 			ToolSavedUpdate:                 true,
 			ToolSavedClearCompleted:         true,
+			ToolCanvasesEdit:                true,
+			ToolCanvasesSectionsLookup:      true,
 		}
 
 		assert.Equal(t, len(expectedTools), len(ValidToolNames), "ValidToolNames should have %d tools", len(expectedTools))
@@ -149,6 +151,8 @@ func TestValidToolNames(t *testing.T) {
 		assert.Equal(t, "saved_list", ToolSavedList)
 		assert.Equal(t, "saved_update", ToolSavedUpdate)
 		assert.Equal(t, "saved_clear_completed", ToolSavedClearCompleted)
+		assert.Equal(t, "canvases_edit", ToolCanvasesEdit)
+		assert.Equal(t, "canvases_sections_lookup", ToolCanvasesSectionsLookup)
 	})
 }
 
@@ -478,4 +482,61 @@ func TestShouldAddTool_Matrix(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestShouldAddTool_WriteTool_CanvasesEdit(t *testing.T) {
+	t.Run("empty enabledTools and no env var - not registered", func(t *testing.T) {
+		cleanup := setEnv("SLACK_MCP_CANVAS_TOOL", "")
+		defer cleanup()
+
+		assert.False(t, shouldAddTool(ToolCanvasesEdit, []string{}, "SLACK_MCP_CANVAS_TOOL"))
+	})
+
+	t.Run("empty enabledTools and env var set - registered", func(t *testing.T) {
+		cleanup := setEnv("SLACK_MCP_CANVAS_TOOL", "true")
+		defer cleanup()
+
+		assert.True(t, shouldAddTool(ToolCanvasesEdit, []string{}, "SLACK_MCP_CANVAS_TOOL"))
+	})
+
+	t.Run("explicit enabledTools names it - registered without env var", func(t *testing.T) {
+		cleanup := setEnv("SLACK_MCP_CANVAS_TOOL", "")
+		defer cleanup()
+
+		assert.True(t, shouldAddTool(ToolCanvasesEdit, []string{ToolCanvasesEdit}, "SLACK_MCP_CANVAS_TOOL"))
+	})
+
+	t.Run("explicit enabledTools omits it - not registered even with env var", func(t *testing.T) {
+		cleanup := setEnv("SLACK_MCP_CANVAS_TOOL", "true")
+		defer cleanup()
+
+		assert.False(t, shouldAddTool(ToolCanvasesEdit, []string{ToolCanvasesSectionsLookup}, "SLACK_MCP_CANVAS_TOOL"))
+	})
+
+	t.Run("sections lookup is read-only and registered by default", func(t *testing.T) {
+		assert.True(t, shouldAddTool(ToolCanvasesSectionsLookup, nil, ""))
+	})
+}
+
+func TestLoggableParams_RedactsCanvasContent(t *testing.T) {
+	markdown := "# Confidential report\nline two"
+	req := mcp.CallToolRequest{}
+	req.Params.Name = ToolCanvasesEdit
+	req.Params.Arguments = map[string]any{
+		"canvas_id": "F0123ABCD",
+		"operation": "insert_at_end",
+		"markdown":  markdown,
+		"title":     "Secret title",
+	}
+
+	rendered := fmt.Sprintf("%v", loggableParams(req))
+	assert.NotContains(t, rendered, "Confidential")
+	assert.NotContains(t, rendered, "Secret title")
+	assert.Contains(t, rendered, fmt.Sprintf("<%d bytes>", len(markdown)))
+	assert.Contains(t, rendered, "F0123ABCD")
+	assert.Equal(t, markdown, req.GetArguments()["markdown"], "redaction must not mutate the request")
+
+	other := mcp.CallToolRequest{}
+	other.Params.Name = ToolChannelsList
+	assert.Equal(t, other.Params, loggableParams(other))
 }
