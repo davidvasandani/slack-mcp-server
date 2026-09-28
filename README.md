@@ -238,6 +238,33 @@ Clear all completed saved items from the "Save for Later" panel. This is a bulk 
 
 - **Parameters:** None.
 
+### 19. canvases_edit
+Edit an existing canvas with Slack's `canvases.edit`, one change per call. The default operation appends Markdown to the end of the canvas without touching existing content.
+
+> **Note:** Canvas editing is disabled by default. To enable, set `SLACK_MCP_CANVAS_TOOL` to any non-empty value, or list `canvases_edit` in `SLACK_MCP_ENABLED_TOOLS`.
+
+> **Required OAuth scopes:** `canvases:write`
+
+- **Parameters:**
+  - `canvas_id` (string, required): Canvas ID in format `Fxxxxxxxxxx` (the last segment of a `https://<workspace>.slack.com/docs/<team>/<canvas_id>` link).
+  - `operation` (string, default: `insert_at_end`): `insert_at_end`, `insert_at_start`, `insert_after`, `insert_before`, `replace`, `delete`, or `rename`.
+  - `markdown` (string): Canvas Markdown. Required for the insert operations and `replace`.
+  - `section_id` (string): Target section from `canvases_sections_lookup`. Required for `insert_after`, `insert_before` and `delete`. Optional for `replace`.
+  - `title` (string): New title. Required for `rename`.
+  - `replace_entire_canvas` (boolean, default: false): Must be `true` for a `replace` without `section_id`, which overwrites the whole canvas.
+- **Verification:** read the canvas back with `attachment_get_data` (`file_id` = `canvas_id`). Edits are not idempotent and are never retried automatically. If an error says the outcome is unknown, read the canvas back before retrying.
+
+### 20. canvases_sections_lookup
+Find canvas sections with Slack's `canvases.sections.lookup`. Returns CSV of `section_id` values for targeted `canvases_edit` operations.
+
+> **Required OAuth scopes:** `canvases:read`
+
+- **Parameters:**
+  - `canvas_id` (string, required): Canvas ID in format `Fxxxxxxxxxx`.
+  - `section_types` (string): Comma-separated `h1`, `h2`, `h3`, `any_header`.
+  - `contains_text` (string): Match sections containing this text.
+  - At least one of `section_types` or `contains_text` is required.
+
 ## Block Kit skill and resources
 
 The MCP server exposes the reusable `slack_blockkit_ui` prompt for designing
@@ -307,12 +334,13 @@ Fetches a CSV directory of all users in the workspace.
 | `SLACK_MCP_ADD_MESSAGE_UNFURLING` | No        | `nil`                     | Enable to let Slack unfurl posted links or set comma-separated list of domains e.g. `github.com,slack.com` to whitelist unfurling only for them. If text contains whitelisted and unknown domain unfurling will be disabled for security reasons.                                         |
 | `SLACK_MCP_REACTION_TOOL`        | No        | `nil`                     | Enable `reactions_add` and `reactions_remove` tools by setting to `true` for all channels, a comma-separated list of channel IDs to whitelist specific channels, or use `!` before a channel ID to allow all except specified ones. If empty, the tools are only registered when explicitly listed in `SLACK_MCP_ENABLED_TOOLS`. |
 | `SLACK_MCP_ATTACHMENT_TOOL`      | No        | Deprecated                | No longer consulted. `attachment_get_data` is a read-only tool registered by default. Use `SLACK_MCP_ENABLED_TOOLS` to restrict the active tool set. |
+| `SLACK_MCP_CANVAS_TOOL`          | No        | `nil`                     | Enable the `canvases_edit` tool by setting it to any non-empty value (e.g. `true`). If empty, the tool is only registered when explicitly listed in `SLACK_MCP_ENABLED_TOOLS`. The read-only `canvases_sections_lookup` tool is registered by default. |
 | `SLACK_MCP_MARK_TOOL`             | No        | `nil`                     | Enable the `conversations_mark` tool by setting to `true` or `1`. Disabled by default to prevent accidental marking of messages as read.                                                                                                                                                  |
 | `SLACK_MCP_USERS_CACHE`           | No        | `~/Library/Caches/slack-mcp-server/users_cache.json` (macOS)<br>`~/.cache/slack-mcp-server/users_cache.json` (Linux)<br>`%LocalAppData%/slack-mcp-server/users_cache.json` (Windows) | Path to the users cache file. Used to cache Slack user information to avoid repeated API calls on startup. |
 | `SLACK_MCP_CHANNELS_CACHE`        | No        | `~/Library/Caches/slack-mcp-server/channels_cache_v2.json` (macOS)<br>`~/.cache/slack-mcp-server/channels_cache_v2.json` (Linux)<br>`%LocalAppData%/slack-mcp-server/channels_cache_v2.json` (Windows) | Path to the channels cache file. Used to cache Slack channel information to avoid repeated API calls on startup. |
 | `SLACK_MCP_LOG_LEVEL`             | No        | `info`                    | Log-level for stdout or stderr. Valid values are: `debug`, `info`, `warn`, `error`, `panic` and `fatal`                                                                                                                                                                                   |
 | `SLACK_MCP_GOVSLACK`              | No        | `nil`                     | Set to `true` to enable [GovSlack](https://slack.com/solutions/govslack) mode. Routes API calls to `slack-gov.com` endpoints instead of `slack.com` for FedRAMP-compliant government workspaces.                                                                                          |
-| `SLACK_MCP_ENABLED_TOOLS`         | No        | `nil`                     | Comma-separated list of tools to register. If empty, all read-only tools (including `attachment_get_data`) and usergroups tools are registered; write tools (`conversations_add_message`, `reactions_add`, `reactions_remove`) require their specific env var OR must be explicitly listed here. When a write tool is listed here, it's enabled without channel restrictions. Available tools: `conversations_history`, `conversations_replies`, `conversations_add_message`, `reactions_add`, `reactions_remove`, `attachment_get_data`, `conversations_search_messages`, `channels_list`, `usergroups_list`, `usergroups_me`, `usergroups_create`, `usergroups_update`, `usergroups_users_update`. |
+| `SLACK_MCP_ENABLED_TOOLS`         | No        | `nil`                     | Comma-separated list of tools to register. If empty, all read-only tools (including `attachment_get_data`) and usergroups tools are registered; write tools (`conversations_add_message`, `reactions_add`, `reactions_remove`, `canvases_edit`) require their specific env var OR must be explicitly listed here. When a write tool is listed here, it's enabled without channel restrictions. Available tools: `conversations_history`, `conversations_replies`, `conversations_add_message`, `reactions_add`, `reactions_remove`, `attachment_get_data`, `conversations_search_messages`, `channels_list`, `usergroups_list`, `usergroups_me`, `usergroups_create`, `usergroups_update`, `usergroups_users_update`, `canvases_edit`, `canvases_sections_lookup`. |
 
 *You need one of: `xoxp` (user), `xoxb` (bot), or both `xoxc`/`xoxd` tokens for authentication.
 

@@ -48,6 +48,8 @@ const (
 	ToolSavedList                   = "saved_list"
 	ToolSavedUpdate                 = "saved_update"
 	ToolSavedClearCompleted         = "saved_clear_completed"
+	ToolCanvasesEdit                = "canvases_edit"
+	ToolCanvasesSectionsLookup      = "canvases_sections_lookup"
 )
 
 var ValidToolNames = []string{
@@ -73,6 +75,8 @@ var ValidToolNames = []string{
 	ToolSavedList,
 	ToolSavedUpdate,
 	ToolSavedClearCompleted,
+	ToolCanvasesEdit,
+	ToolCanvasesSectionsLookup,
 }
 
 func ValidateEnabledTools(tools []string) error {
@@ -251,6 +255,58 @@ func NewMCPServer(provider *provider.ApiProvider, logger *zap.Logger, enabledToo
 				mcp.Description("The ID of the attachment to download, in format Fxxxxxxxxxx. Attachment IDs (with filenames) can be found in the AttachmentIDs field of message metadata when FileCount > 0."),
 			),
 		), conversationsHandler.FilesGetHandler)
+	}
+
+	canvasesHandler := handler.NewCanvasesHandler(provider, logger)
+
+	// Canvas edits mutate shared documents, so like message posting they are
+	// opt-in: named in SLACK_MCP_ENABLED_TOOLS, or SLACK_MCP_CANVAS_TOOL set.
+	if shouldAddTool(ToolCanvasesEdit, enabledTools, "SLACK_MCP_CANVAS_TOOL") {
+		s.AddTool(mcp.NewTool(ToolCanvasesEdit,
+			mcp.WithDescription("Edit an existing Slack canvas with canvases.edit, applying one change per call. The default operation appends Markdown to the end without touching existing content. Use canvases_sections_lookup to find a section_id for targeted edits, and verify the result by reading the canvas back with attachment_get_data (file_id = canvas_id). Edits are not idempotent: if the outcome is reported unknown, read the canvas back before retrying."),
+			mcp.WithTitleAnnotation("Edit Canvas"),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithString("canvas_id",
+				mcp.Required(),
+				mcp.Description("ID of the canvas in format Fxxxxxxxxxx (the last path segment of a https://<workspace>.slack.com/docs/<team>/<canvas_id> link)."),
+			),
+			mcp.WithString("operation",
+				mcp.DefaultString("insert_at_end"),
+				mcp.Enum("insert_at_end", "insert_at_start", "insert_after", "insert_before", "replace", "delete", "rename"),
+				mcp.Description("insert_at_end (default, append) and insert_at_start need markdown; insert_after and insert_before need markdown and section_id; replace needs markdown and either section_id or replace_entire_canvas=true; delete needs section_id; rename needs title."),
+			),
+			mcp.WithString("markdown",
+				mcp.Description("Canvas Markdown content for insert and replace operations."),
+			),
+			mcp.WithString("section_id",
+				mcp.Description("Target section ID returned by canvases_sections_lookup."),
+			),
+			mcp.WithString("title",
+				mcp.Description("New canvas title for operation=rename."),
+			),
+			mcp.WithBoolean("replace_entire_canvas",
+				mcp.Description("Must be true to confirm a replace without section_id, which overwrites the whole canvas. Default is false."),
+				mcp.DefaultBool(false),
+			),
+		), canvasesHandler.CanvasesEditHandler)
+	}
+
+	if shouldAddTool(ToolCanvasesSectionsLookup, enabledTools, "") {
+		s.AddTool(mcp.NewTool(ToolCanvasesSectionsLookup,
+			mcp.WithDescription("Find sections of a Slack canvas with canvases.sections.lookup. Returns CSV of section_id values usable by canvases_edit for insert_after, insert_before, replace, and delete."),
+			mcp.WithTitleAnnotation("Find Canvas Sections"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithString("canvas_id",
+				mcp.Required(),
+				mcp.Description("ID of the canvas in format Fxxxxxxxxxx."),
+			),
+			mcp.WithString("section_types",
+				mcp.Description("Comma-separated section types to match. Allowed values: 'h1', 'h2', 'h3', 'any_header'. At least one of section_types or contains_text is required."),
+			),
+			mcp.WithString("contains_text",
+				mcp.Description("Match sections containing this text."),
+			),
+		), canvasesHandler.CanvasesSectionsLookupHandler)
 	}
 
 	conversationsSearchTool := mcp.NewTool(ToolConversationsSearchMessages,
@@ -714,7 +770,7 @@ func buildLoggerMiddleware(logger *zap.Logger) server.ToolHandlerMiddleware {
 		return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			logger.Info("Request received",
 				zap.String("tool", req.Params.Name),
-				zap.Any("params", req.Params),
+				zap.Any("params", loggableParams(req)),
 			)
 
 			startTime := time.Now()
@@ -731,4 +787,27 @@ func buildLoggerMiddleware(logger *zap.Logger) server.ToolHandlerMiddleware {
 			return res, err
 		}
 	}
+}
+
+// canvasContentArgs are logged as byte counts: canvas documents can be large
+// and may hold content the caller would not want copied into service logs.
+var canvasContentArgs = []string{"markdown", "title"}
+
+func loggableParams(req mcp.CallToolRequest) any {
+	if req.Params.Name != ToolCanvasesEdit {
+		return req.Params
+	}
+	args := req.GetArguments()
+	redacted := make(map[string]any, len(args))
+	for key, value := range args {
+		redacted[key] = value
+		if slices.Contains(canvasContentArgs, key) {
+			if text, ok := value.(string); ok {
+				redacted[key] = fmt.Sprintf("<%d bytes>", len(text))
+			} else {
+				redacted[key] = "<redacted>"
+			}
+		}
+	}
+	return map[string]any{"name": req.Params.Name, "arguments": redacted}
 }
